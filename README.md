@@ -9,6 +9,8 @@
 
 this script will keep a log of repos updated based in the dir you are running the script from.
 
+By default, if a repo has been updated in the last 10 minutes, it is skipped. You can change the threshold in the script via the THRESHOLD var
+
 ## Uses
 
 -f --force 
