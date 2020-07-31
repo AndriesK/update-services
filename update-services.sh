@@ -21,6 +21,7 @@ branch=master
 
 should_force=false
 updated=false
+build=false
 updateReturnCode=0
 # Handle params passed
 while [ "$1" != "" ]; do
@@ -34,11 +35,14 @@ while [ "$1" != "" ]; do
 	-b | --branch )		shift
 				branch=$1
 				;;
-        * )                     usage
-                                exit 1
+	-build | --build )      shift
+				build=true
+				;;
     esac
-    shift
+    # shift
 done
+
+echo "Params: $*"
 
 gitoutput=""
 
@@ -65,19 +69,27 @@ for FILE in *; do
 				if [[ "$should_force" = true ]];
 				then
 					echo "--force used - forcing update.."
-				else 
+				else
 					echo "Last update exceeds threshold... updating: $FILE"
 				fi
 				gitoutput=$(git pull origin $branch 2>&1)
 				updateReturnCode=$?
 				if [ $updateReturnCode -eq 0 ]; then
 					updated=true
+					if [[ $gitoutput =~ "Already up to date" ]]; then
+						updated=false
+					fi
+					if [[ "$build" = true ]] && [[ -f provisioning/build.sh ]]; then
+						cd ..
+						sudo $FILE/provisioning/build.sh
+						cd $FILE
+					fi
 					if [[ "$OSTYPE" == "darwin"* ]]; then
 						gsed -i "/${FILE}_.*/d" $DONE_LOG
 						if [ ! $? -eq 0 ]; then
 							echo "please do brew install gnu-sed"
 						fi
-					else 
+					else
 						sed -i "/${FILE}_.*/d" $DONE_LOG
 					fi
 					echo "${FILE}_$CURRENT_DATE_UNIX_TIMESTAMP" >> $DONE_LOG
@@ -91,14 +103,17 @@ for FILE in *; do
 			echo "Never checked, do update for: $FILE"
 			gitoutput=$(git pull origin $branch 2>&1)
 			updateReturnCode=$?
+			updated=true
 			if [ $updateReturnCode -eq 0 ]; then
-				updated=true
+				if [[ $gitoutput =~ "Already up to date" ]]; then
+					updated=false
+				fi
 				if [[ "$OSTYPE" == "darwin"* ]]; then
 					gsed -i "/${FILE}_.*/d" $DONE_LOG
 					if [ ! $? -eq 0 ]; then
 						echo "please do brew install gnu-sed"
 					fi
-				else 
+				else
 					sed -i "/${FILE}_.*/d" $DONE_LOG
 				fi
 				echo "${FILE}_$CURRENT_DATE_UNIX_TIMESTAMP" >> $DONE_LOG
@@ -108,7 +123,7 @@ for FILE in *; do
 		if [ $updateReturnCode -eq 0 ]; then
 			echo "Result: $FILE updated: $updated"
 		else
-			if [[ $gitoutput =~ "find remote ref $branch" ]] 
+			if [[ $gitoutput =~ "find remote ref $branch" ]]
 			then
 				echo "No branch "$branch" on remote..continuing"
 			else
